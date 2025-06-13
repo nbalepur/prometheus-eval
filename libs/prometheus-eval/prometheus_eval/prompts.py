@@ -157,8 +157,8 @@ An instruction (might include an Input inside it), a response to evaluate, and a
 
 BINARY_RUBRIC_TEMPLATE = """
 [{criteria}]
-Score YES: {YES_description}
-Score NO: {NO_description}
+Score YES: {scoreYES_description}
+Score NO: {scoreNO_description}
 """.strip()
 
 
