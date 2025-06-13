@@ -137,6 +137,30 @@ An instruction (might include an Input inside it), two responses to evaluate (de
 
 ###Feedback: """
 
+BINARY_PROMPT_WO_REF = """###Task Description:
+An instruction (might include an Input inside it), a response to evaluate, and a score rubric representing a evaluation criteria are given.
+1. Write a detailed feedback that assess the quality of the response strictly based on the given score rubric, not evaluating in general.
+2. After writing a feedback, write a score that is either the string 'YES' or 'NO'. You should refer to the score rubric.
+3. The output format should look as follows: "(write a feedback for criteria) [RESULT] (the string 'YES' or 'NO')"
+4. Please do not generate any other opening, closing, and explanations.
+
+###The instruction to evaluate:
+{instruction}
+
+###Response to evaluate:
+{response}
+
+###Score Rubrics:
+{rubric}
+
+###Feedback: """
+
+BINARY_RUBRIC_TEMPLATE = """
+[{criteria}]
+Score YES: {YES_description}
+Score NO: {NO_description}
+""".strip()
+
 
 SCORE_RUBRIC_TEMPLATE = """
 [{criteria}]

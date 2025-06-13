@@ -9,6 +9,7 @@ from .prompts import (
     ABSOLUTE_PROMPT_WO_REF,
     REL_SYSTEM_PROMPT,
     RELATIVE_PROMPT_WO_REF,
+    BINARY_PROMPT_WO_REF,
 )
 from .utils import async_batch_completions_with_retries, batch_completions_with_retries
 
@@ -21,6 +22,7 @@ class PrometheusEval:
         self,
         model,
         absolute_grade_template: str = ABSOLUTE_PROMPT_WO_REF,
+        binary_grade_template: str = BINARY_PROMPT_WO_REF,
         relative_grade_template: str = RELATIVE_PROMPT_WO_REF,
     ):
         self.is_async = False  # Flag to indicate if the model is asynchronous
@@ -43,6 +45,7 @@ class PrometheusEval:
         self.model = model
         self.absolute_grade_template = absolute_grade_template
         self.relative_grade_template = relative_grade_template
+        self.binary_grade_template = binary_grade_template
 
     def _get_conversation_prompt(self, messages: List[Dict[str, str]]):
         """
@@ -79,6 +82,33 @@ class PrometheusEval:
         :return: A tuple containing the feedback and score.
         """
         feedbacks, scores = self.absolute_grade(
+            instructions=[instruction],
+            responses=[response],
+            rubric=[rubric],
+            reference_answers=[reference_answer] if reference_answer else [None],
+            params=params,
+        )
+        return feedbacks[0], scores[0]
+    
+    def single_binary_grade(
+        self,
+        instruction: str,
+        response: str,
+        rubric: str,
+        reference_answer: str = None,
+        params: Dict[str, Any] = {},
+    ) -> Tuple[str, int]:
+        """
+        Grades a single response on a binary scale (answers a YES/NO question) based on the provided instruction and response.
+
+        :param instruction: The instruction for the response.
+        :param response: The response to grade.
+        :param rubric: The rubric to use for grading.
+        :param reference_answer: Optional reference answer to aid in grading.
+        :param params: Additional parameters for the model completion requests. Refer to the vllm SamplingParmas class.
+        :return: A tuple containing the feedback and score.
+        """
+        feedbacks, scores = self.binary_grade(
             instructions=[instruction],
             responses=[response],
             rubric=[rubric],
@@ -210,6 +240,67 @@ class PrometheusEval:
                 self.model,
                 inputs,
                 mode="absolute",
+                params=params,
+            )
+
+        return feedbacks, scores
+    
+    def binary_grade(
+        self,
+        *,
+        instructions: List[str],
+        responses: List[str],
+        rubric: List[str] | str,
+        reference_answers: List[str] = None,
+        params: Dict[str, Any] = {},
+    ) -> Tuple[List[str], List[int]]:
+        """
+        Grades a batch of responses on a binary scale (answers a YES/NO question) based on the provided instructions and responses.
+
+        :param instructions: List of instructions corresponding to each response.
+        :param responses: List of responses to grade.
+        :param params: Parameters for the model completion requests. Refer to the vllm SamplingParmas class.
+        :return: A tuple containing lists of feedbacks and scores.
+        """
+
+        instructions, responses, rubric, reference_answers = self._check_inputs(
+            instructions, responses, rubric, reference_answers
+        )
+
+        inputs = []
+        for idx, (instruction, response) in enumerate(zip(instructions, responses)):
+            rubric_ = rubric[idx]
+            reference_answer = reference_answers[idx]
+            content = self.binary_grade_template.format(
+                instruction=instruction,
+                response=response,
+                rubric=rubric_,
+                reference_answer=reference_answer,
+            )
+            messages = [
+                {"role": "system", "content": ABS_SYSTEM_PROMPT},
+                {"role": "user", "content": content},
+            ]
+            if hasattr(self.model, "validate_vllm"):
+                input_ = self._get_conversation_prompt(messages)
+            else:
+                input_ = messages
+            inputs.append(input_)
+
+        if self.is_async:
+            feedbacks, scores = asyncio.run(
+                async_batch_completions_with_retries(
+                    self.model,
+                    inputs,
+                    mode="binary",
+                    params=params,
+                )
+            )
+        else:
+            feedbacks, scores = batch_completions_with_retries(
+                self.model,
+                inputs,
+                mode="binary",
                 params=params,
             )
 

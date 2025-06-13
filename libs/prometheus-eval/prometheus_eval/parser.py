@@ -29,6 +29,27 @@ def _parse_output_absolute(output):
 
     return None, None
 
+def _parse_output_binary(output):
+    pattern = r"""
+        (?:                        # Start of non-capturing group
+            \[RESULT\]|\[SCORE\]|   # Match [RESULT] or [SCORE]
+            Score:?|score:?|        # Match Score: or score:
+            Result:?|\[Result\]:?|  # Match Result: or [Result]:
+            score\s+of              # Match "score of"
+        )
+        \s*                         # Allow any whitespace
+        (?:\(|\[|\s)*               # Allow opening brackets or whitespace
+        (YES|NO)                    # Capture "YES" or "NO"
+        (?:\)|\]|\s|$)?             # Allow optional closing bracket, whitespace, or end of string
+    """
+    match = re.search(pattern, output, re.IGNORECASE | re.VERBOSE)
+
+    if match:
+        result = match.group(1).upper()
+        feedback = output[:match.start()].strip()
+        return output, result
+    else:
+        return output, None
 
 def _parse_output_relative(output):
     explicit_pattern = r"""
@@ -60,6 +81,7 @@ def parse_output(output, mode: str):
     assert mode in [
         "absolute",
         "relative",
+        "binary",
     ], "Invalid mode. Supported modes are: 'absolute', 'relative'"
 
     if output is None:
@@ -67,5 +89,7 @@ def parse_output(output, mode: str):
 
     if mode == "absolute":
         return _parse_output_absolute(output)
+    if mode == "binary":
+        return _parse_output_binary(output)
     elif mode == "relative":
         return _parse_output_relative(output)

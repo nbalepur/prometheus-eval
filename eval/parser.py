@@ -24,6 +24,29 @@ def _parse_output_absolute(output):
 
     return None, None
 
+def _parse_output_binary(output):
+    # Extended pattern to match more variations of result presentation
+    # pattern = r"""
+    #     (?:\[RESULT\]|Score:|score:|Result:|\[Result\]|score of|\(|\[|\])\s*  # Match different prefixes including '[RESULT]', 'Score:', etc.
+    #     (?:\[RESULT\]|Score:|score:|Result:|\[Result\]|score of|\(|\[|\])\s*
+    #     |(\d+)\s*                               # Catch trailing numbers
+    #     |\((\d+)\)                              # Catch numbers within parentheses
+    #     |\[(\d+)\]                              # Catch numbers within brackets
+    # """
+    pattern = r"""(?:\[RESULT\]|Score|\[SCORE\]|\[RESULT\]:|Score:|score:|Result:|\[Result\]|score of)\s*(?:\(\s*|\[\s*|)?(YES|NO)"""
+    matches = re.search(pattern, output, re.IGNORECASE | re.VERBOSE)
+
+    if matches:
+        # Extract the first group that matches (ignoring None)
+        result = next((int(match) for match in matches.groups() if match), None)
+        if result is not None:
+            feedback = (
+                output.split("[RESULT]")[0].strip() if "[RESULT]" in output else output
+            )
+            return feedback, result
+
+    return None, None
+
 
 def _parse_output_relative(output):
     # Updated pattern to match [RESULT] A/B, [Response A/B], and [Result] Response A/B formats
@@ -58,6 +81,7 @@ def parse_output(outputs, mode: str):
     assert mode in [
         "absolute",
         "relative",
+        "binary",
     ], "Invalid mode. Supported modes are: 'absolute' and 'relative'"
 
     if mode == "absolute":
@@ -65,6 +89,9 @@ def parse_output(outputs, mode: str):
 
     if mode == "relative":
         return _parse_output_relative(outputs)
+    
+    if mode == "binary":
+        return _parse_output_binary(outputs)
 
 
 if __name__ == "__main__":
